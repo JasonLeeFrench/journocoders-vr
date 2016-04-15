@@ -4,12 +4,15 @@
   var WINDOW_HEIGHT = window.innerHeight;
   var WORLD_WIDTH = 2000;
   var WORLD_HEIGHT = 1900;
+  var MAX_ELEVATION = 200;
 
   var scene = new THREE.Scene();
 
   var clock = new THREE.Clock();
 
   var camera = new THREE.PerspectiveCamera(75, WINDOW_WIDTH / WINDOW_HEIGHT, 1, 5000);
+  var raycaster = new THREE.Raycaster();
+
   camera.position.set(0, -199, 75);
   camera.up = new THREE.Vector3(0,0,1);
   camera.lookAt(scene.position);
@@ -50,6 +53,52 @@
     });
   });
 
+  function checkWorldEdges() {
+      var atWorldsEnd = false;
+      // Set max elevation for the camera
+      if (camera.position.z > MAX_ELEVATION) {
+          camera.position.z = MAX_ELEVATION;
+      }
+      // Make sure the camera is not exceeding the x or y bounds of the scene
+      if (camera.position.x > WORLD_WIDTH / 2 - 150 ) {
+          camera.position.x = WORLD_WIDTH / 2 - 150 ;
+          atWorldsEnd = true;
+      } else if (camera.position.x < -WORLD_WIDTH / 2 + 150) {
+          camera.position.x = -WORLD_WIDTH / 2 + 150;
+          atWorldsEnd = true;
+      }
+
+      if (camera.position.y > WORLD_HEIGHT / 2 - 150) {
+          camera.position.y = WORLD_HEIGHT / 2 - 150;
+          atWorldsEnd = true;
+      } else if (camera.position.y < -WORLD_HEIGHT / 2 + 150) {
+          camera.position.y = -WORLD_HEIGHT / 2 + 150;
+          atWorldsEnd = true;
+      }
+  };
+
+  function detectCollisions() {
+    // only do anything if moving
+    if (controls.moveVector.x !== 0 || controls.moveVector.y !== 0 || controls.moveVector.z !== 0){
+      // Add the camera's rotation (Quaternion) to the movement vector
+      // To get the actual movement direction in the scene
+      var direction = controls.moveVector.clone();
+      direction.applyQuaternion(camera.quaternion);
+
+      raycaster.set(controls.object.position, direction);
+
+      var intersects = raycaster.intersectObject(surface);
+
+      if (intersects.length > 0 && intersects[0].distance < 10) {
+        controls.movementSpeed = 0.25 * intersects[0].distance;
+      } else if (controls.movementSpeed < 20) {
+        // slight linear acceleration
+        controls.movementSpeed += 1;
+      }
+    }
+  }
+
+
   // Lights!
   var dirLight = new THREE.DirectionalLight( 0xffffff, 0.75);
   dirLight.position.set( -1, 1, 1).normalize();
@@ -79,10 +128,12 @@
   // Render loop
   function render() {
     var delta = clock.getDelta();
+    detectCollisions();
+    checkWorldEdges();
     controls.update(delta);
     requestAnimationFrame( render );
     manager.render(scene, camera);
   }
-  
+
   render();
 }());
